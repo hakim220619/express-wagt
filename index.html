@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp QR Code</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #qr-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        #qr-code {
+            margin-top: 20px;
+        }
+        #sessionId {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        #message-form {
+            display: none;
+            margin-top: 20px;
+        }
+        label {
+            display: block;
+            margin: 10px 0 5px;
+        }
+        input, textarea {
+            width: 300px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+        table {
+            margin-top: 20px;
+            width: 80%;
+            border-collapse: collapse;
+            margin: auto;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+
+        /* Modal styles */
+        #session-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        #session-modal-content {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            width: 80%;
+            max-width: 800px;
+            text-align: left;
+        }
+        #close-modal {
+            float: right;
+            cursor: pointer;
+            font-size: 20px;
+            color: red;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="qr-container">
+        <button id="generate-qr-btn">Generate QR Code</button>
+        <img id="qr-code" src="" alt="QR Code will be displayed here" style="display:none;">
+        <p id="sessionId"></p>
+    </div>
+
+    <div id="message-form">
+        <h2>Send WhatsApp Message</h2>
+        <label for="number">Phone Number (International format without +):</label>
+        <input type="text" id="number" placeholder="e.g. 6281234567890">
+        <label for="message">Message:</label>
+        <textarea id="message" placeholder="Type your message here"></textarea>
+        <button id="send-message-btn">Send Message</button>
+    </div>
+
+    <!-- Button to open modal -->
+    <button id="show-sessions-btn">Show Active Sessions</button>
+
+    <!-- Modal -->
+    <div id="session-modal">
+        <div id="session-modal-content">
+            <span id="close-modal">&times;</span>
+            <h2>Active Sessions</h2>
+            <table id="session-table" style="display:none;">
+                <thead>
+                    <tr>
+                        <th>Session ID</th>
+                        <th>Name</th>
+                        <th>Number</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        let currentSessionId = null;
+
+        document.getElementById("generate-qr-btn").addEventListener("click", async function () {
+            try {
+                const response = await axios.post('/start-session');
+                
+                if (response.data.qr) {
+                    const qrImage = document.getElementById("qr-code");
+                    qrImage.src = response.data.qr;
+                    qrImage.style.display = "block";
+
+                    currentSessionId = response.data.sessionId;
+                    const sessionIdText = document.getElementById("sessionId");
+                    sessionIdText.textContent = `Session ID: ${currentSessionId}`;
+                } else {
+                    alert("Failed to generate QR Code");
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                alert("Error generating QR Code");
+            }
+        });
+
+        setInterval(async () => {
+            if (currentSessionId) {
+                try {
+                    const statusResponse = await axios.get(`/check-session/${currentSessionId}`);
+
+                    if (statusResponse.data.status) {
+                        document.getElementById("message-form").style.display = "block";
+                    }
+                } catch (error) {
+                    console.error("Error checking session:", error);
+                }
+            }
+        }, 5000);
+
+        document.getElementById("send-message-btn").addEventListener("click", async function () {
+            const number = document.getElementById("number").value;
+            const message = document.getElementById("message").value;
+
+            if (!number || !message) {
+                alert("Number and message cannot be empty");
+                return;
+            }
+
+            try {
+                const sendMessageResponse = await axios.post('/send-message', {
+                    sessionId: currentSessionId,
+                    number: number,
+                    message: message
+                });
+
+                if (sendMessageResponse.data.status) {
+                    alert("Message sent successfully");
+                } else {
+                    alert("Failed to send message: " + sendMessageResponse.data.message);
+                }
+            } catch (error) {
+                console.error("Error sending message:", error);
+                alert("Error sending message");
+            }
+        });
+
+        async function fetchSessions() {
+            try {
+                const response = await axios.get('/list-sessions');
+                const sessionTable = document.getElementById('session-table');
+                const tableBody = sessionTable.querySelector('tbody');
+                tableBody.innerHTML = ''; // Clear the table first
+        
+                if (response.data.length > 0) {
+                    sessionTable.style.display = "table";
+                    response.data.forEach(session => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${session.sessionId}</td>
+                            <td>${session.name}</td>
+                            <td>${session.number}</td>
+                            <td>${session.status}</td>
+                            <td>
+                                ${session.status === 'connected' ? '' : 
+                                    `<button onclick="reconnectSession('${session.sessionId}')">Reconnect</button>`
+                                }
+                            </td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                } else {
+                    sessionTable.style.display = "none"; // Hide the table if no sessions
+                }
+            } catch (error) {
+                console.error("Error fetching sessions:", error);
+            }
+        }
+        
+        async function reconnectSession(sessionId) {
+            try {
+                const response = await axios.post(`/reconnect-session/${sessionId}`);
+                if (response.data.status) {
+                    alert('Session reconnected successfully');
+                    fetchSessions(); // Refresh the session list after reconnecting
+                } else {
+                    alert('Failed to reconnect session: ' + response.data.message);
+                }
+            } catch (error) {
+                console.error("Error reconnecting session:", error);
+                alert('Error reconnecting session');
+            }
+        }
+        
+
+        const modal = document.getElementById("session-modal");
+        const showModalBtn = document.getElementById("show-sessions-btn");
+        const closeModal = document.getElementById("close-modal");
+
+        showModalBtn.addEventListener("click", () => {
+            modal.style.display = "flex"; // Show the modal
+            fetchSessions(); // Fetch and display the sessions when modal opens
+        });
+
+        closeModal.addEventListener("click", () => {
+            modal.style.display = "none"; // Hide the modal
+        });
+
+        window.addEventListener("click", (event) => {
+            if (event.target === modal) {
+                modal.style.display = "none"; // Hide modal when clicking outside
+            }
+        });
+    </script>
+</body>
+</html>

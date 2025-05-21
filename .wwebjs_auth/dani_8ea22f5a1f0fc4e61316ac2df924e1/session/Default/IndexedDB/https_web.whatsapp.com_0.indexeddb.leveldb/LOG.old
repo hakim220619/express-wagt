@@ -1,0 +1,59 @@
+2025/05/21-23:58:49.231 8403 Reusing MANIFEST /Users/itrnd/Documents/dani/project/express-wagt/.wwebjs_auth/dani_8ea22f5a1f0fc4e61316ac2df924e1/session/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/05/21-23:58:49.231 8403 Recovering log #751
+2025/05/21-23:58:49.258 8403 Reusing old log /Users/itrnd/Documents/dani/project/express-wagt/.wwebjs_auth/dani_8ea22f5a1f0fc4e61316ac2df924e1/session/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000751.log 
+2025/05/21-23:58:50.734 1f103 Level-0 table #776: started
+2025/05/21-23:58:50.744 1f103 Level-0 table #776: 420112 bytes OK
+2025/05/21-23:58:50.754 1f103 Delete type=0 #751
+2025/05/21-23:58:50.755 1f103 Manual compaction at level-0 from '\x00\x1c\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x1d\x00\x00\x00' @ 0 : 0; will stop at '\x00\x1c\x00\x00\x05' @ 2987424 : 1
+2025/05/21-23:58:50.755 1f103 Compacting 1@0 + 0@1 files
+2025/05/21-23:58:50.765 1f103 Generated table #777@0: 8297 keys, 182945 bytes
+2025/05/21-23:58:50.770 1f103 Generated table #778@0: 163 keys, 25041 bytes
+2025/05/21-23:58:50.770 1f103 Compacted 1@0 + 0@1 files => 207986 bytes
+2025/05/21-23:58:50.779 1f103 compacted to: files[ 0 2 28 0 0 0 0 ]
+2025/05/21-23:58:50.779 1f103 Delete type=2 #776
+2025/05/21-23:58:50.780 1f103 Manual compaction at level-0 from '\x00\x1c\x00\x00\x05' @ 2987424 : 1 .. '\x00\x1d\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/05/21-23:58:51.824 21a03 Compacting 1@1 + 8@2 files
+2025/05/21-23:58:51.856 21a03 Generated table #779@1: 26236 keys, 2204943 bytes
+2025/05/21-23:58:51.878 21a03 Generated table #780@1: 8345 keys, 2132324 bytes
+2025/05/21-23:58:51.916 21a03 Generated table #781@1: 53022 keys, 2187898 bytes
+2025/05/21-23:58:51.967 21a03 Generated table #782@1: 98970 keys, 2249696 bytes
+2025/05/21-23:58:52.016 21a03 Generated table #783@1: 99936 keys, 2248948 bytes
+2025/05/21-23:58:52.065 21a03 Generated table #784@1: 99524 keys, 2250328 bytes
+2025/05/21-23:58:52.114 21a03 Generated table #785@1: 100362 keys, 2251366 bytes
+2025/05/21-23:58:52.129 21a03 Generated table #786@1: 22046 keys, 495972 bytes
+2025/05/21-23:58:52.129 21a03 Compacted 1@1 + 8@2 files => 16021475 bytes
+2025/05/21-23:58:52.137 21a03 compacted to: files[ 0 1 28 0 0 0 0 ]
+2025/05/21-23:58:52.137 21a03 Delete type=2 #758
+2025/05/21-23:58:52.137 21a03 Delete type=2 #759
+2025/05/21-23:58:52.138 21a03 Delete type=2 #761
+2025/05/21-23:58:52.138 21a03 Delete type=2 #760
+2025/05/21-23:58:52.138 21a03 Delete type=2 #762
+2025/05/21-23:58:52.138 21a03 Delete type=2 #778
+2025/05/21-23:58:52.138 21a03 Delete type=2 #755
+2025/05/21-23:58:52.138 21a03 Delete type=2 #757
+2025/05/21-23:58:52.138 21a03 Delete type=2 #756
+2025/05/21-23:58:52.394 8403 Compacting 1@1 + 10@2 files
+2025/05/21-23:58:52.442 8403 Generated table #787@1: 40339 keys, 2199782 bytes
+2025/05/21-23:58:52.484 8403 Generated table #788@1: 53394 keys, 2218230 bytes
+2025/05/21-23:58:52.501 8403 Generated table #789@1: 4382 keys, 2152153 bytes
+2025/05/21-23:58:52.516 8403 Generated table #790@1: 2281 keys, 2149251 bytes
+2025/05/21-23:58:52.530 8403 Generated table #791@1: 1617 keys, 2168721 bytes
+2025/05/21-23:58:52.545 8403 Generated table #792@1: 2465 keys, 2158354 bytes
+2025/05/21-23:58:52.561 8403 Generated table #793@1: 2387 keys, 2155536 bytes
+2025/05/21-23:58:52.577 8403 Generated table #794@1: 3456 keys, 2152204 bytes
+2025/05/21-23:58:52.612 8403 Generated table #795@1: 29399 keys, 2244221 bytes
+2025/05/21-23:58:52.646 8403 Generated table #796@1: 26887 keys, 2272343 bytes
+2025/05/21-23:58:52.650 8403 Generated table #797@1: 367 keys, 23515 bytes
+2025/05/21-23:58:52.650 8403 Compacted 1@1 + 10@2 files => 21894310 bytes
+2025/05/21-23:58:52.659 8403 compacted to: files[ 0 0 29 0 0 0 0 ]
+2025/05/21-23:58:52.659 8403 Delete type=2 #767
+2025/05/21-23:58:52.659 8403 Delete type=2 #766
+2025/05/21-23:58:52.659 8403 Delete type=2 #772
+2025/05/21-23:58:52.659 8403 Delete type=2 #764
+2025/05/21-23:58:52.659 8403 Delete type=2 #770
+2025/05/21-23:58:52.659 8403 Delete type=2 #771
+2025/05/21-23:58:52.659 8403 Delete type=2 #765
+2025/05/21-23:58:52.659 8403 Delete type=2 #763
+2025/05/21-23:58:52.659 8403 Delete type=2 #777
+2025/05/21-23:58:52.659 8403 Delete type=2 #768
+2025/05/21-23:58:52.659 8403 Delete type=2 #769

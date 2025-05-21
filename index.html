@@ -197,7 +197,8 @@
             </div>
         </div>
 
-        <div id="send-message-modal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="sendMessageModalLabel" aria-hidden="true">
+        <div id="send-message-modal" class="modal fade" tabindex="-1" role="dialog"
+            aria-labelledby="sendMessageModalLabel" aria-hidden="true">
             <div class="modal-dialog" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -209,11 +210,13 @@
                     <div class="modal-body">
                         <div class="form-group">
                             <label for="number">Phone Number (International format without +):</label>
-                            <input type="text" id="numberasd" value="6285797887711" placeholder="e.g. 6281234567890" class="form-control" />
+                            <input type="text" id="numberasd" value="6285797887711" placeholder="e.g. 6281234567890"
+                                class="form-control" />
                         </div>
                         <div class="form-group">
                             <label for="message">Message:</label>
-                            <textarea id="messageasd" placeholder="Type your message here" class="form-control"></textarea>
+                            <textarea id="messageasd" placeholder="Type your message here"
+                                class="form-control"></textarea>
                         </div>
                         <div class="form-group">
                             <label for="file">Attach File:</label>
@@ -223,10 +226,13 @@
                             <label>Optional Buttons:</label>
                             <div id="buttons-container">
                                 <div class="input-group mb-2">
-                                    <input type="text" class="form-control" placeholder="Button Text" aria-label="Button Text" id="buttonText1">
-                                    <input type="text" class="form-control" placeholder="Button ID" aria-label="Button ID" id="buttonId1">
+                                    <input type="text" class="form-control" placeholder="Button Text"
+                                        aria-label="Button Text" id="buttonText1">
+                                    <input type="text" class="form-control" placeholder="Button ID"
+                                        aria-label="Button ID" id="buttonId1">
                                     <div class="input-group-append">
-                                        <button class="btn btn-danger" type="button" onclick="removeButton(this)">Remove</button>
+                                        <button class="btn btn-danger" type="button"
+                                            onclick="removeButton(this)">Remove</button>
                                     </div>
                                 </div>
                                 <!-- Additional buttons can be dynamically added here -->
@@ -236,7 +242,8 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                        <button id="send-message-btn" class="btn btn-success" onclick="sendMessage()">Send Message</button>
+                        <button id="send-message-btn" class="btn btn-success" onclick="sendMessage()">Send
+                            Message</button>
                     </div>
                 </div>
             </div>
@@ -266,11 +273,11 @@
                 const message = document.getElementById('messageasd').value;
                 const fileInput = document.getElementById('file');
                 const buttons = [];
-            
+
                 // Gather button information
                 const buttonTexts = document.querySelectorAll('input[id^="buttonText"]');
                 const buttonIds = document.querySelectorAll('input[id^="buttonId"]');
-            
+
                 buttonTexts.forEach((textInput, index) => {
                     const text = textInput.value.trim();
                     const id = buttonIds[index].value.trim();
@@ -278,16 +285,16 @@
                         buttons.push({ text, id });
                     }
                 });
-            
+
                 const formData = new FormData();
                 formData.append('sessionId', currentSessionId); // Replace with actual session ID
                 formData.append('number', number);
                 formData.append('message', message);
-            
+
                 if (fileInput.files.length > 0) {
                     formData.append('file', fileInput.files[0]);
                 }
-            
+
                 if (buttons.length > 0) {
                     formData.append('buttons', JSON.stringify(buttons)); // Correctly add buttons to the form data
                 }
@@ -296,21 +303,21 @@
                     method: 'POST',
                     body: formData
                 })
-                .then(response => response.json())
-                .then(data => {
-                    console.log(data);
-                    if (data.status) {
-                        alert("Message sent successfully!");
-                    } else {
-                        alert("Error: " + data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert("An error occurred while sending the message.");
-                });
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log(data);
+                        if (data.status) {
+                            alert("Message sent successfully!");
+                        } else {
+                            alert("Error: " + data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert("An error occurred while sending the message.");
+                    });
             }
-            
+
             function addButton() {
                 const buttonsContainer = document.getElementById('buttons-container');
                 const index = buttonsContainer.children.length + 1; // Get current number of buttons
@@ -325,7 +332,7 @@
                 `;
                 buttonsContainer.appendChild(buttonGroup);
             }
-            
+
             function removeButton(button) {
                 const buttonGroup = button.closest('.input-group');
                 buttonGroup.remove();

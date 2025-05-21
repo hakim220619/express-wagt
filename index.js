@@ -264,6 +264,7 @@ app.post("/reconnect-session", async (req, res) => {
   try {
     // Inisialisasi ulang client dan cek hasilnya
     const result = await initializeClient(sessionId, sessionPath);
+    console.log(result);
 
     if (result.status === "ready") {
       return res.status(200).json({

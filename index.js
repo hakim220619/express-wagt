@@ -1,15 +1,18 @@
-const { Client, LocalAuth } = require("whatsapp-web.js");
+const { Client, LocalAuth, MessageMedia } = require("whatsapp-web.js");
 const qrcode = require("qrcode");
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const cors = require("cors");
+const puppeteer = require("puppeteer");
+const multer = require("multer");
 
+// Express app setup
 const app = express();
-const port = 3000;
+const port = 5000;
 
-// Middleware untuk mengizinkan semua origin
+// Middleware untuk mengizinkan semua origin (CORS)
 app.use(cors());
 // Middleware untuk parsing JSON
 app.use(express.json());
@@ -22,48 +25,66 @@ function generateRandomString(length = 30) {
   return crypto.randomBytes(length).toString("hex").slice(0, length);
 }
 
+// Argumen Puppeteer untuk kompatibilitas di berbagai server
+const puppeteerOptions = {
+  headless: true,
+  args: [
+    "--no-sandbox", // Nonaktifkan sandboxing untuk kompatibilitas di server
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage", // Kurangi penggunaan shared memory
+    "--single-process", // Jalankan dalam mode proses tunggal
+    "--no-zygote",
+    "--disable-gpu", // Nonaktifkan GPU untuk server tanpa antarmuka grafis
+  ],
+};
+
 // Fungsi untuk menginisialisasi client
 function initializeClient(sessionId, sessionPath) {
   return new Promise((resolve, reject) => {
     const client = new Client({
       authStrategy: new LocalAuth({
-          dataPath: sessionPath, // Path to store session data
+        dataPath: sessionPath, // Path untuk menyimpan data sesi
       }),
       puppeteer: {
-          headless: true,
-          executablePath: '/usr/bin/chromium-browser',
-          args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        headless: true,
+        // executablePath: '/usr/bin/chromium-browser',
+        args: puppeteerOptions.args, // Argumen Puppeteer yang aman untuk berbagai lingkungan server
       },
-  });
+    });
 
     client.on("qr", async (qr) => {
       try {
-        // Convert QR code to base64
+        // Mengubah QR code menjadi format base64 untuk ditampilkan
         const qrBase64 = await qrcode.toDataURL(qr);
-        resolve({ qr: qrBase64, status: 'qr' }); // Resolve dengan QR code dalam base64
+        resolve({ qr: qrBase64, status: "qr" });
       } catch (err) {
         reject(err);
       }
     });
 
     client.on("ready", () => {
-      console.log(`Client with session ID ${sessionId} is ready!`);
-      resolve({ status: 'ready' });
+      console.log(`Client dengan Session ID ${sessionId} siap digunakan!`);
+      resolve({ status: "ready" });
     });
 
     client.on("authenticated", () => {
-      console.log(`Client with session ID ${sessionId} authenticated!`);
+      console.log(
+        `Client dengan Session ID ${sessionId} telah terautentikasi!`
+      );
     });
 
     client.on("auth_failure", (msg) => {
-      console.error(`Authentication failed for session ID ${sessionId}:`, msg);
-      reject(new Error(`Authentication failed: ${msg}`));
+      console.error(`Autentikasi gagal untuk Session ID ${sessionId}:`, msg);
+      reject(new Error(`Autentikasi gagal: ${msg}`));
     });
 
     client.on("disconnected", (reason) => {
-      console.log(`Client with session ID ${sessionId} was logged out`, reason);
+      console.log(
+        `Client dengan Session ID ${sessionId} telah terputus`,
+        reason
+      );
       client.destroy();
-      delete clients[sessionId]; // Hapus client dari pool
+      delete clients[sessionId]; // Hapus client dari pool setelah disconnect
     });
 
     client.initialize();
@@ -73,28 +94,67 @@ function initializeClient(sessionId, sessionPath) {
 
 app.post("/start-session", async (req, res) => {
   try {
-    const sessionId = generateRandomString();
-    const sessionPath = path.join(__dirname, ".wwebjs_auth", sessionId);
+    const { sessionName } = req.body; // Ambil nama session dari request body
+    if (!sessionName) {
+      return res
+        .status(400)
+        .json({ status: false, message: "Session name is required." });
+    }
 
+    const sessionId = generateRandomString();
+    const sessionPath = path.join(
+      __dirname,
+      ".wwebjs_auth",
+      sessionName + "_" + sessionId
+    );
+
+    // Cek apakah folder sessionPath ada, jika tidak buat folder baru
     if (!fs.existsSync(sessionPath)) {
       fs.mkdirSync(sessionPath, { recursive: true });
     }
 
+    console.log(`Initializing session: ${sessionName} with ID: ${sessionId}`);
+
+    // Inisialisasi client dan kirim QR code ke client
     const qrCode = await initializeClient(sessionId, sessionPath);
-    res.json({ sessionId, qr: qrCode.qr }); // Mengirimkan QR code dalam base64
+
+    // Kirim response ke client
+    res.json({
+      status: true,
+      sessionId,
+      sessionName,
+      qr: qrCode.qr,
+    });
   } catch (error) {
+    console.error("Error creating session:", error);
     res.status(500).json({ status: false, message: error.message });
   }
 });
 
 // Endpoint untuk mengirim pesan menggunakan sesi tertentu
-app.post("/send-message", async (req, res) => {
-  const { sessionId, number, message } = req.body;
+const upload = multer({
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  storage: multer.memoryStorage(), // Simpan di memory
+  fileFilter: (req, file, cb) => {
+    if (
+      file.mimetype === "image/jpeg" ||
+      file.mimetype === "image/png" ||
+      file.mimetype === "application/pdf"
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error("Format file tidak diizinkan"));
+    }
+  },
+});
 
-  if (!sessionId || !number || !message) {
+app.post("/send-message", upload.single("file"), async (req, res) => {
+  const { sessionId, number, message, buttons } = req.body;
+
+  if (!sessionId || !number) {
     return res.status(400).json({
       status: false,
-      message: "Session ID, nomor, dan pesan harus disertakan",
+      message: "Session ID dan nomor harus disertakan",
     });
   }
 
@@ -108,17 +168,38 @@ app.post("/send-message", async (req, res) => {
   const client = clients[sessionId];
 
   try {
-    // Nomor harus dalam format internasional tanpa tanda +, misalnya: 6281234567890
     const chatId = `${number}@c.us`;
 
-    await client.sendMessage(chatId, message);
+    if (req.file) {
+      const media = new MessageMedia(req.file.mimetype, req.file.buffer.toString("base64"), req.file.originalname);
+      await client.sendMessage(chatId, media, { caption: message || "" });
+    } else if (buttons && Array.isArray(buttons) && buttons.length > 0) {
+      const buttonMessage = {
+        header: { text: "Pilih opsi:" },
+        footer: message || "",
+        buttons: buttons.map((button) => ({
+          buttonId: button.id,
+          buttonText: { displayText: button.text },
+        })),
+        type: 1,
+      };
+
+      console.log("Button Message:", JSON.stringify(buttonMessage, null, 2));
+      await client.sendMessage(chatId, buttonMessage);
+    } else if (message) {
+      await client.sendMessage(chatId, message);
+    } else {
+      return res.status(400).json({
+        status: false,
+        message: "Pesan atau file harus disertakan",
+      });
+    }
 
     res.status(200).json({
       status: true,
       message: "Pesan berhasil dikirim",
     });
   } catch (error) {
-    console.error("Error saat mengirim pesan:", error);
     res.status(500).json({
       status: false,
       message: "Gagal mengirim pesan",
@@ -127,40 +208,33 @@ app.post("/send-message", async (req, res) => {
   }
 });
 
-// Endpoint untuk memeriksa status koneksi dari sesi tertentu
-app.get("/check-session/:sessionId", (req, res) => {
-  const { sessionId } = req.params;
 
-  if (!clients[sessionId]) {
-    return res.status(404).json({
-      status: false,
-      message: "Session ID tidak ditemukan atau tidak terhubung",
-    });
-  }
+app.get("/check-session/:sessionId", async (req, res) => {
+  const sessionId = req.params.sessionId;
 
   const client = clients[sessionId];
 
-  if (client.info && client.info.wid) {
-    // Jika client sudah siap dan terhubung, kirim nomor dan nama pengguna
-    const userNumber = client.info.wid.user; // Ambil hanya nomor
-    const userName = client.info.pushname;
-
+  // Check if the client is ready
+  if (client.info && client.ready) {
     return res.status(200).json({
       status: true,
-      message: "Client is connected",
-      number: userNumber, // Nomor telepon hanya angka
-      name: userName,
+      message: "Sesi tersedia dan siap digunakan",
+      sessionId: sessionId,
+      userInfo: {
+        number: client.info.wid.user,
+        name: client.info.pushname || "N/A",
+      },
     });
   } else {
-    // Jika client tidak terhubung atau sedang terputus
-    return res.status(200).json({
+    return res.status(400).json({
       status: false,
-      message: "Client is disconnected or not ready",
+      message: "Sesi tidak siap",
+      sessionId: sessionId,
     });
   }
 });
 
-// Endpoint untuk reconnect manual
+// Endpoint untuk reconnect manual ke sesi
 app.post("/reconnect-session", async (req, res) => {
   const { sessionId } = req.body;
 
@@ -191,16 +265,18 @@ app.post("/reconnect-session", async (req, res) => {
     // Inisialisasi ulang client dan cek hasilnya
     const result = await initializeClient(sessionId, sessionPath);
 
-    if (result.status === 'ready') {
+    if (result.status === "ready") {
       return res.status(200).json({
         status: true,
         message: `Reconnect berhasil untuk session ${sessionId} dan klien siap digunakan.`,
       });
-    } else if (result.status === 'qr') {
+    } else if (result.status === "qr") {
+      console.log(result.qr);
+
       return res.status(200).json({
         status: true,
         message: `Reconnect berhasil untuk session ${sessionId}. QR code dihasilkan.`,
-        qr: result.qr // Kirim QR code jika dihasilkan
+        qr: result.qr, // Kirim QR code jika dihasilkan
       });
     }
   } catch (error) {
@@ -211,28 +287,138 @@ app.post("/reconnect-session", async (req, res) => {
     });
   }
 });
-
-// Endpoint untuk mendapatkan daftar sesi yang aktif
+// Endpoint untuk mendapatkan daftar sesi aktif dan isi folder .wwebjs_auth
 app.get("/list-sessions", (req, res) => {
-  const sessionList = Object.keys(clients).map((sessionId) => {
-    const client = clients[sessionId];
-    return {
-      sessionId: sessionId,
-      number: client.info ? client.info.wid.user : "N/A",
-      name: client.info ? client.info.pushname : "N/A"
-    };
-  });
+  // Membaca isi folder .wwebjs_auth
+  const authFolderPath = path.join(__dirname, ".wwebjs_auth");
 
-  res.json(sessionList);
+  fs.readdir(authFolderPath, (err, files) => {
+    if (err) {
+      return res
+        .status(500)
+        .json({ error: "Gagal membaca folder .wwebjs_auth." });
+    }
+
+    // Mapping daftar sesi
+    const sessionList = Object.keys(clients).map((sessionId) => {
+      const client = clients[sessionId];
+
+      return {
+        sessionId: sessionId,
+        number: client.info ? client.info.wid.user : "N/A",
+        name: client.info ? client.info.pushname : "N/A",
+      };
+    });
+
+    // Menggabungkan data sesi dan isi folder
+    res.json({
+      sessions: sessionList,
+      authFiles: files,
+    });
+  });
 });
 
-// Endpoint untuk serve file index.html
-const { resolve } = require('path');
+// Endpoint untuk memutuskan sambungan sesi
+app.post("/disconnect-session", async (req, res) => {
+  const { sessionId } = req.body;
+
+  if (!sessionId) {
+    return res.status(400).json({
+      status: false,
+      message: "Session ID harus disertakan",
+    });
+  }
+
+  if (!clients[sessionId]) {
+    return res.status(404).json({
+      status: false,
+      message: "Session ID tidak ditemukan atau tidak terhubung",
+    });
+  }
+
+  const client = clients[sessionId];
+
+  try {
+    await client.destroy(); // Memutuskan sambungan client
+    delete clients[sessionId]; // Menghapus client dari pool
+    res.status(200).json({
+      status: true,
+      message: `Sesi ${sessionId} berhasil diputuskan.`,
+    });
+  } catch (error) {
+    console.error("Error saat memutuskan sambungan:", error);
+    res.status(500).json({
+      status: false,
+      message: "Gagal memutuskan sambungan",
+      error: error.message,
+    });
+  }
+});
+
+// Endpoint untuk menghapus file autentikasi
+const { rimraf } = require("rimraf"); // Import dengan CommonJS
+
+// Endpoint untuk menghapus file autentikasi
+app.delete("/delete-auth-file/:fileName", async (req, res) => {
+  const fileName = req.params.fileName;
+  const filePath = path.join(__dirname, ".wwebjs_auth", fileName);
+
+  try {
+    await rimraf(filePath); // Menghapus file secara async
+    res.json({ message: `File ${fileName} berhasil dihapus.` });
+  } catch (err) {
+    console.error(`Gagal menghapus file ${fileName}:`, err);
+    res
+      .status(500)
+      .json({ error: "Gagal menghapus file. Pastikan file tidak digunakan." });
+  }
+});
+
+// Endpoint untuk mendapatkan daftar grup dari sesi tertentu
+app.get("/list-groups/:sessionId", async (req, res) => {
+  const { sessionId } = req.params;
+
+  if (!clients[sessionId]) {
+    return res.status(404).json({
+      status: false,
+      message: "Session ID tidak ditemukan atau tidak terhubung",
+    });
+  }
+
+  const client = clients[sessionId];
+
+  try {
+    const chats = await client.getChats();
+    const groups = chats
+      .filter((chat) => chat.isGroup) // Filter hanya grup
+      .map((group) => ({
+        id: group.id._serialized,
+        name: group.name,
+        participants: group.participants.length,
+      }));
+
+    res.status(200).json({
+      status: true,
+      message: "Daftar grup berhasil diambil",
+      groups,
+    });
+  } catch (error) {
+    console.error("Error saat mengambil daftar grup:", error);
+    res.status(500).json({
+      status: false,
+      message: "Gagal mengambil daftar grup",
+      error: error.message,
+    });
+  }
+});
+
+// Endpoint untuk serve file index.html (optional)
+const { resolve } = require("path");
 app.get("/", (req, res) => {
   res.sendFile(resolve(__dirname, "index.html"));
 });
 
 // Menjalankan server di port yang ditentukan
-app.listen(port, () => {
-  console.log(`Server berjalan di http://localhost:${port}`);
+app.listen(port, "0.0.0.0", () => {
+  console.log(`Server running on localhost:${port}`);
 });

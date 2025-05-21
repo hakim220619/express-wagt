@@ -233,21 +233,14 @@ app.get("/check-session/:sessionId", async (req, res) => {
     });
   }
 });
-
-// Endpoint untuk reconnect manual ke sesi
+// Endpoint 1: Trigger reconnect secara async
 app.post("/reconnect-session", async (req, res) => {
   const { sessionId } = req.body;
 
-  if (!sessionId) {
-    return res.status(400).json({
-      status: false,
-      message: "Session ID harus disertakan",
-    });
-  }
+  if (!sessionId) return res.status(400).json({ status: false, message: "Session ID wajib" });
 
   const sessionPath = path.join(__dirname, ".wwebjs_auth", sessionId);
 
-  // Cek apakah folder untuk sessionId tersebut ada
   if (!fs.existsSync(sessionPath)) {
     return res.status(404).json({
       status: false,
@@ -255,39 +248,41 @@ app.post("/reconnect-session", async (req, res) => {
     });
   }
 
-  // Jika client sudah ada di memory, hapus client yang ada sebelum reconnect
+  // Destroy client lama jika ada
   if (clients[sessionId]) {
     clients[sessionId].destroy();
     delete clients[sessionId];
   }
 
-  try {
-    // Inisialisasi ulang client dan cek hasilnya
-    const result = await initializeClient(sessionId, sessionPath);
-    console.log(result);
-
-    if (result.status === "ready") {
-      return res.status(200).json({
-        status: true,
-        message: `Reconnect berhasil untuk session ${sessionId} dan klien siap digunakan.`,
-      });
-    } else if (result.status === "qr") {
-      console.log(result.qr);
-
-      return res.status(200).json({
-        status: true,
-        message: `Reconnect berhasil untuk session ${sessionId}. QR code dihasilkan.`,
-        qr: result.qr, // Kirim QR code jika dihasilkan
-      });
-    }
-  } catch (error) {
-    return res.status(500).json({
-      status: false,
-      message: `Gagal reconnect untuk session ${sessionId}`,
-      error: error.message,
+  // Trigger proses async
+  initializeClient(sessionId, sessionPath)
+    .then((result) => {
+      // Simpan status di memori atau database
+      sessionStatus[sessionId] = result;
+    })
+    .catch((error) => {
+      sessionStatus[sessionId] = { status: "error", message: error.message };
     });
-  }
+
+  // Segera response ke client
+  return res.status(202).json({
+    status: true,
+    message: "Proses reconnect dimulai. Silakan periksa status beberapa saat lagi.",
+  });
 });
+
+// Endpoint 2: Cek status session
+app.get("/session-status/:id", (req, res) => {
+  const sessionId = req.params.id;
+  const status = sessionStatus[sessionId];
+
+  if (!status) {
+    return res.status(404).json({ status: false, message: "Belum ada status untuk session ini" });
+  }
+
+  return res.json({ status: true, sessionStatus: status });
+});
+
 // Endpoint untuk mendapatkan daftar sesi aktif dan isi folder .wwebjs_auth
 app.get("/list-sessions", (req, res) => {
   // Membaca isi folder .wwebjs_auth

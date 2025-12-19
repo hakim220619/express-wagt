@@ -256,6 +256,82 @@
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
         <script>
             let currentSessionId = null;
+            let sessionPollInterval = null;
+
+            const LS_LAST_SESSION_ID = "lastSessionId";
+            const LS_REFRESHED_FOR_SESSION = "refreshedForSessionId";
+
+            function setStatusText(text) {
+                const sessionIdText = document.getElementById("sessionId");
+                if (sessionIdText) sessionIdText.textContent = text;
+            }
+
+            function stopPolling() {
+                if (sessionPollInterval) {
+                    clearInterval(sessionPollInterval);
+                    sessionPollInterval = null;
+                }
+            }
+
+            async function pollSessionUntilReady(sessionId, { autoRefreshOnce = true } = {}) {
+                stopPolling();
+
+                const qrImage = document.getElementById("qr-code");
+                const messageForm = document.getElementById("message-form");
+
+                async function checkOnce() {
+                    try {
+                        // Prefer session-status (more detailed), fallback to check-session
+                        let statusResp = null;
+                        try {
+                            statusResp = await axios.get(`/session-status/${encodeURIComponent(sessionId)}`);
+                        } catch (e) {
+                            // ignore and fallback
+                        }
+
+                        const s = statusResp?.data?.sessionStatus;
+                        if (s?.status) {
+                            if (s.status === "ready") {
+                                stopPolling();
+                                setStatusText(`Session ID: ${sessionId} (CONNECTED)`);
+                                if (qrImage) qrImage.style.display = "none";
+                                if (messageForm) messageForm.style.display = "block";
+
+                                const refreshedFor = localStorage.getItem(LS_REFRESHED_FOR_SESSION);
+                                if (autoRefreshOnce && refreshedFor !== sessionId) {
+                                    localStorage.setItem(LS_REFRESHED_FOR_SESSION, sessionId);
+                                    // small delay so UI updates are visible
+                                    setTimeout(() => window.location.reload(), 800);
+                                }
+                                return;
+                            }
+
+                            if (s.status === "qr" && s.qr && qrImage && qrImage.style.display !== "block") {
+                                qrImage.src = s.qr;
+                                qrImage.style.display = "block";
+                            }
+
+                            setStatusText(`Session ID: ${sessionId} (${s.status})`);
+                            return;
+                        }
+
+                        // Fallback: basic check endpoint
+                        const readyResp = await axios.get(`/check-session/${encodeURIComponent(sessionId)}`);
+                        if (readyResp.data?.status) {
+                            stopPolling();
+                            setStatusText(`Session ID: ${sessionId} (CONNECTED)`);
+                            if (qrImage) qrImage.style.display = "none";
+                            if (messageForm) messageForm.style.display = "block";
+                        }
+                    } catch (err) {
+                        // Not ready yet / still initializing. Keep polling silently.
+                    }
+                }
+
+                await checkOnce();
+                sessionPollInterval = setInterval(checkOnce, 3000);
+            }
+
             function openSendMessageModal(sessionId) {
                 currentSessionId = sessionId; // Set currentSessionId to the selected sessionId
                 document.getElementById("numberasd").value = "6285797887711"; // Clear previous input
@@ -370,7 +446,12 @@
                             qrImage.style.display = "block";
 
                             currentSessionId = response.data.sessionId;
-                            sessionIdText.textContent = `Session ID: ${currentSessionId}`;
+                            localStorage.setItem(LS_LAST_SESSION_ID, currentSessionId);
+                            localStorage.removeItem(LS_REFRESHED_FOR_SESSION);
+                            sessionIdText.textContent = `Session ID: ${currentSessionId} (qr)`;
+
+                            // Auto check until connected, then refresh once
+                            pollSessionUntilReady(currentSessionId, { autoRefreshOnce: true });
 
                             // Hide QR Code after 10 seconds
                         } else {
@@ -527,13 +608,13 @@
 
                 try {
                     const response = await axios.post(`/reconnect-session`, { sessionId });
-                    if (response.data.status && response.data.qr) {
-                        displayQRCode(sessionId, response.data.qr);
+                    fetchSessions();
+                    alert(response.data.message);
 
-                    } else {
-                        fetchSessions();
-                        alert(response.data.message);
-                    }
+                    // Poll until we get QR / ready, then update UI
+                    currentSessionId = sessionId;
+                    localStorage.setItem(LS_LAST_SESSION_ID, currentSessionId);
+                    pollSessionUntilReady(currentSessionId, { autoRefreshOnce: true });
                 } catch (error) {
                     console.error(`Error reconnecting session ${sessionId}:`, error);
                     alert(`Gagal reconnect untuk session ${sessionId}.`);
@@ -614,6 +695,15 @@
             window.addEventListener("click", (event) => {
                 if (event.target === modal) {
                     modal.modal('hide');
+                }
+            });
+
+            // On page load: if we have a last session id, auto-check status
+            window.addEventListener("load", () => {
+                const last = localStorage.getItem(LS_LAST_SESSION_ID);
+                if (last) {
+                    currentSessionId = last;
+                    pollSessionUntilReady(last, { autoRefreshOnce: false });
                 }
             });
 
